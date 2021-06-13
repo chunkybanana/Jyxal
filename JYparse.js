@@ -71,6 +71,28 @@ exports.parse = function(code){
             else if(char === '\\' && !escaped) escaped = true;
             continue;
         }
+        if(structure == 'FUNC_NAME'){
+            if(char == ';'){
+                tokens.push(new TOKEN('FUNC_CALL',string_so_far))
+                structure = 'NONE'
+            } else if(char == '|'){
+                tokens.push(new TOKEN('FUNC_DEF',string_so_far))
+                struct_nest.push('FUNC')
+                structure = 'NONE'
+            } else {
+                string_so_far += char;
+            }
+            continue;
+        }
+        if(structure == 'FUNC_REF'){
+            if(char == ';'){
+                tokens.push(new TOKEN('FUNC_REF',string_so_far))
+                structure = 'NONE'
+            } else {
+                string_so_far += char;
+            }
+            continue;
+        }
         if(VAR_CHARS.includes(char) && structure == 'VAR_GET'){
             string_so_far += char;
             continue;
@@ -114,6 +136,11 @@ exports.parse = function(code){
             continue;
         }
         if(mod_count) mod_count--;
+        if(char === ';' && struct_nest[struct_nest.length - 1] == 'FUNC'){
+            struct_nest.pop()
+            tokens.push(new TOKEN('CLOSE_FUNC',''));
+            continue;
+        }
         if(char === STRING_DELIMITER){            
             if(structure == 'STRING'){
                 structure = 'NONE';
@@ -181,6 +208,12 @@ exports.parse = function(code){
             string_so_far = '';
         } else if(char == VAR_SET){
             structure = 'VAR_SET';
+            string_so_far = '';
+        } else if(char == '@'){
+            structure = 'FUNC_NAME';
+            string_so_far = '';
+        } else if(char == '°'){
+            structure = 'FUNC_REF'
             string_so_far = '';
         } else {
             tokens.push(new TOKEN('ELEMENT',char))

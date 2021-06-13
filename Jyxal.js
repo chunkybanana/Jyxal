@@ -70,4 +70,4 @@ function run(code){
     console.log(output)
 }
 
-run('←abc')
+run('@a:b:c|:;')
