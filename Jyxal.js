@@ -11,7 +11,7 @@ function run(code){
     var output = '',
     compiled = '';
     stack = [];
-    //console.log(parse(code))
+    console.log(parse(code))
     for(token of parse(code)){
         switch(token.NAME){
             case 'NUMBER': 
@@ -22,7 +22,7 @@ function run(code){
                 }
                 break;
             case 'STRING':
-                compiled += `stack.push(\`${eval(token.SOURCE.replace('\\','\\\\\\\\'))}\`);`;
+                compiled += `stack.push(${token.SOURCE});`;
                 break;
             case 'FOR':
                 var id = token.SOURCE || 'context_var', id2 = randID();
@@ -61,6 +61,7 @@ function run(code){
                     compiled += '}; func.arity = arity; stack.push(func);';
                 }
                 break;
+            default: break;
         }
     }
     //console.log(compiled);
@@ -69,4 +70,4 @@ function run(code){
     console.log(output)
 }
 
-run('λ;,')
+run('‛ab,')

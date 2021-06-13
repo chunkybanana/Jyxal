@@ -1,7 +1,13 @@
 const STRING_DELIMITER = '`';
 const MODIFIERS = '→←vß\\⁽¨ø∆kÞ⁺';
-const TWO_MODS = '‡≬₌₍';
-const BETTER_MODIFIERS = 'vß⁽'
+const TWO_MODS = {
+    '‡': 'TWO_BYTE_LAMBDA',
+    '₌': 'PARALLEL_APPLY',
+    '₍': 'LIST_PARALELL_APPLY'
+}
+const SCC = '‛';
+const THREE_MOD = '≬';
+const BETTER_MODIFIERS = 'vß⁽';
 const NUMBER_CHARS = '1234567890.';
 const BASE_255_STRING = '«';
 const BASE_255_INT = '»';
@@ -34,7 +40,9 @@ exports.parse = function(code){
     tokens = [],
     struct_nest = [],
     active_code = '',
-    string_so_far = '';
+    string_so_far = '',
+    mod_count = 0,
+    escaped = false;
     for(char of code){
         if(structure === 'CHAR'){
             if(BETTER_MODIFIERS.includes(string_so_far[string_so_far.length - 1]) && MODIFIERS.includes(char)) {
@@ -54,14 +62,36 @@ exports.parse = function(code){
             string_so_far += char;
             continue;
         }
-        if(structure === 'STRING' && char !== STRING_DELIMITER){
+        if(structure === 'STRING' && (char !== STRING_DELIMITER || escaped)){
             string_so_far += char;
+            if(escaped) escaped = false 
+            else if(char === '\\' && !escaped) escaped = true;
             continue;
         }
         if(!NUMBER_CHARS.includes(char) && structure == 'NUMBER' && string_so_far){
             tokens.push(new TOKEN('NUMBER',string_so_far))
             string_so_far = ''
         } 
+        if(mod_count == 2 && struct_nest.length && struct_nest[struct_nest.length - 1].includes('PARALLEL')){
+            tokens.push(new TOKEN('BRANCH',struct_nest[struct_nest.length - 1]))
+        }
+        if(mod_count == 1){
+            if(struct_nest[struct_nest.length - 1].includes('PARALLEL')){
+                tokens.push(new TOKEN('CLOSE_'+struct_nest[struct_nest.length - 1],''))
+            } else {
+                tokens.push(new TOKEN('CLOSE_MAP',struct_nest[struct_nest.length - 1]))
+            }
+            struct_nest.pop()
+        }
+        if(structure == 'SCC'){
+            string_so_far += char;
+            if(string_so_far.length == 2){
+                structure = 'NONE';
+                tokens.push(new TOKEN('STRING',`\`${string_so_far}\``))
+            }
+            continue;
+        }
+        if(mod_count) mod_count--;
         if(char === STRING_DELIMITER){            
             if(structure == 'STRING'){
                 structure = 'NONE';
@@ -114,6 +144,16 @@ exports.parse = function(code){
             structure = 'NONE'
         } else if(NOPS.includes(char)){
             structure = 'NONE'
+        } else if(char in TWO_MODS){
+            mod_count = 3;
+            tokens.push(new TOKEN(TWO_MODS[char],''))
+            struct_nest.push(TWO_MODS[char])
+        } else if(char == THREE_MOD){
+            tokens.push(new TOKEN('THREE_BYTE_LAMBDA',''))
+            mod_count = 4;
+            struct_nest.push('THREE_BYTE_LAMBDA')
+        } else if(char == SCC){
+            structure = 'SCC';
         } else {
             tokens.push(new TOKEN('ELEMENT',char))
             structure = 'NONE'
@@ -126,6 +166,6 @@ exports.parse = function(code){
         }
     }
     if(structure !== 'NONE') tokens.push(new TOKEN(structure,string_so_far));
-    for(i of struct_nest.reverse()) tokens.push(new TOKEN('CLOSE_' + (['LAMBDA','SORT_MAP','FILTER'].includes(i)?'MAP':i), i))
+    for(i of struct_nest.reverse()) tokens.push(new TOKEN('CLOSE_' + (['LAMBDA','SORT_MAP','FILTER','TWO_BYTE_LAMBDA','THREE_BYTE_LAMBDA'].includes(i)?'MAP':i), i))
     return tokens
 }
