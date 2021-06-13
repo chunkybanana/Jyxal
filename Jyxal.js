@@ -64,10 +64,10 @@ function run(code){
             default: break;
         }
     }
-    //console.log(compiled);
+    console.log(compiled);
     eval(compiled)
     //console.log(stack)
     console.log(output)
 }
 
-run('‛ab,')
+run('←abc')

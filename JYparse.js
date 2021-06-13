@@ -1,5 +1,5 @@
 const STRING_DELIMITER = '`';
-const MODIFIERS = '→←vß\\⁽¨ø∆kÞ⁺';
+const MODIFIERS = 'vß\\⁽¨ø∆kÞ⁺';
 const TWO_MODS = {
     '‡': 'TWO_BYTE_LAMBDA',
     '₌': 'PARALLEL_APPLY',
@@ -7,6 +7,9 @@ const TWO_MODS = {
 }
 const SCC = '‛';
 const THREE_MOD = '≬';
+const VAR_GET = '←';
+const VAR_SET = '→';
+const VAR_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const BETTER_MODIFIERS = 'vß⁽';
 const NUMBER_CHARS = '1234567890.';
 const BASE_255_STRING = '«';
@@ -68,9 +71,28 @@ exports.parse = function(code){
             else if(char === '\\' && !escaped) escaped = true;
             continue;
         }
+        if(VAR_CHARS.includes(char) && structure == 'VAR_GET'){
+            string_so_far += char;
+            continue;
+        }
+        if(VAR_CHARS.includes(char) && structure == 'VAR_SET'){
+            string_so_far += char;
+            continue;
+        }
         if(!NUMBER_CHARS.includes(char) && structure == 'NUMBER' && string_so_far){
             tokens.push(new TOKEN('NUMBER',string_so_far))
             string_so_far = ''
+            structure = 'NONE'
+        }
+        if(!VAR_CHARS.includes(char) && structure == 'VAR_GET' && string_so_far){
+            tokens.push(new TOKEN('VAR_GET',string_so_far))
+            string_so_far = ''
+            structure = 'NONE'
+        } 
+        if(!VAR_CHARS.includes(char) && structure == 'VAR_SET' && string_so_far){
+            tokens.push(new TOKEN('VAR_SET',string_so_far))
+            string_so_far = ''
+            structure = 'NONE'
         } 
         if(mod_count == 2 && struct_nest.length && struct_nest[struct_nest.length - 1].includes('PARALLEL')){
             tokens.push(new TOKEN('BRANCH',struct_nest[struct_nest.length - 1]))
@@ -133,7 +155,7 @@ exports.parse = function(code){
             tokens.push(new TOKEN(CLOSING[char], struct_nest.pop()));
         } else if(char == '|'){
             if(struct_nest[struct_nest.length-1] == 'FOR'){
-                tokens.pop()
+                while(tokens.pop().NAME !== 'FOR');
                 tokens.push(new TOKEN('FOR',active_code.replace(/\s/g,'')))
             }
             if(struct_nest[struct_nest.length-1] == 'LAMBDA'){
@@ -154,11 +176,17 @@ exports.parse = function(code){
             struct_nest.push('THREE_BYTE_LAMBDA')
         } else if(char == SCC){
             structure = 'SCC';
+        } else if(char == VAR_GET){
+            structure = 'VAR_GET';
+            string_so_far = '';
+        } else if(char == VAR_SET){
+            structure = 'VAR_SET';
+            string_so_far = '';
         } else {
             tokens.push(new TOKEN('ELEMENT',char))
             structure = 'NONE'
         }
-        if(struct_nest[struct_nest.length-1] == 'FOR' && char != '|' && !string_so_far){
+        if(struct_nest[struct_nest.length-1] == 'FOR' && VAR_CHARS.includes(char) && !string_so_far){
             active_code += char;
         } 
         if(struct_nest[struct_nest.length-1] == 'LAMBDA' && char != '|' && !string_so_far){
