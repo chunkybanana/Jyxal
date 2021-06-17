@@ -47,6 +47,10 @@ exports.parse = function(code){
     mod_count = 0,
     escaped = false;
     for(char of code){
+        if(structure === 'COMMENT'){
+            if(char == '\n') structure = 'NONE'
+            continue;
+        }
         if(structure === 'CHAR'){
             if(BETTER_MODIFIERS.includes(string_so_far[string_so_far.length - 1]) && MODIFIERS.includes(char)) {
                 string_so_far += char;
@@ -79,6 +83,7 @@ exports.parse = function(code){
                 tokens.push(new TOKEN('FUNC_DEF',string_so_far))
                 struct_nest.push('FUNC')
                 structure = 'NONE'
+                string_so_far = ''
             } else {
                 string_so_far += char;
             }
@@ -103,6 +108,7 @@ exports.parse = function(code){
         }
         if(!NUMBER_CHARS.includes(char) && structure == 'NUMBER' && string_so_far){
             tokens.push(new TOKEN('NUMBER',string_so_far))
+            console.log(string_so_far)
             string_so_far = ''
             structure = 'NONE'
         }
@@ -215,6 +221,8 @@ exports.parse = function(code){
         } else if(char == '°'){
             structure = 'FUNC_REF'
             string_so_far = '';
+        } else if(char == '#'){
+            structure = 'COMMENT'
         } else {
             tokens.push(new TOKEN('ELEMENT',char))
             structure = 'NONE'
@@ -227,6 +235,6 @@ exports.parse = function(code){
         }
     }
     if(structure !== 'NONE') tokens.push(new TOKEN(structure,string_so_far));
-    for(i of struct_nest.reverse()) tokens.push(new TOKEN('CLOSE_' + (['LAMBDA','SORT_MAP','FILTER','TWO_BYTE_LAMBDA','THREE_BYTE_LAMBDA'].includes(i)?'MAP':i), i))
+    for(i of struct_nest.reverse()) tokens.push(new TOKEN('CLOSE_' + (['LAMBDA','SORT_MAP','FILTER','TWO_BYTE_LAMBDA','THREE_BYTE_LAMBDA','FUNC'].includes(i)?'MAP':i), i))
     return tokens
 }
