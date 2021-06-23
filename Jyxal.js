@@ -8,6 +8,7 @@ function randID(){
     return output;
 }
 function add(lhs,rhs){
+    console.log(lhs,rhs)
     if((typeof rhs == 'bigint' && typeof lhs == 'number') || (typeof rhs == 'number' && typeof lhs == 'bigint')){
         return Number(rhs) + Number(lhs)
     } else if((typeof lhs == typeof rhs) && !Array.isArray(lhs) ){
@@ -20,12 +21,47 @@ function add(lhs,rhs){
         return list.map(val => add(val,other))
     }
 }
-function range(val){
-    if(typeof val == 'bigint'){
-        return [...Array(Number(val))].map((x,i) => BigInt(i))
+function lambda_sort(val,key){
+    return val.map(n => [n,key(n)]).sort(([A,a],[B,b]) => a > b ? 1 : a < b ? -1 : 0).map(n => n[0]);
+}
+function lambda_map(val,func){
+    if(typeof val == 'number' || typeof val == 'bigint'){
+        val = range(val)
+    } else if (typeof val == 'string'){
+        var join = true;
+        val = [...val]
+    } 
+    val = val.map(func);
+    if(join) val = val.join('')
+    return val;
+}
+function lambda_filt(val,func){
+    if(typeof val == 'number' || typeof val == 'bigint'){
+        val = range(val)
+    } else if (typeof val == 'string'){
+        var join = true;
+        val = [...val]
+    } 
+    val = val.filter(func);
+    if(join) val = val.join('')
+    return val;
+}
+function sorted(val){
+    if(typeof val === 'string'){
+        return [...string].sort().join('')
+    } else if(typeof val[0] === 'number' || typeof val[0] === 'bigint'){
+        return val.sort((a,b)=>a-b)
     } else {
-        return [...Array(val)].map((x,i) => i)
+        return val;
     }
+}
+function range(val,inc){
+    if(typeof val == 'bigint'){
+        return [...Array(Number(val))].map((x,i) => BigInt(i) + BigInt(inc))
+    } else if( typeof val == 'number') {
+        return [...Array(val)].map((x,i) => i + inc)
+    } 
+    return val
 }
 function run(code,inputs){
     function last(arr){
@@ -54,7 +90,7 @@ function run(code,inputs){
     var output = '',
     compiled = '';
     stack = [],
-    inputstack = [inputs];
+    inputstack = [inputs.reverse()];
     console.log(parse(code))
     for(token of parse(code)){
         switch(token.NAME){
@@ -98,11 +134,20 @@ function run(code,inputs){
             case 'CLOSE_LIST': compiled += 'temp_list.push(pop(stack));stack.push(temp_list);'; break;
             case 'ELEMENT': compiled += commands[token.SOURCE]; break;
             case 'LAMBDA': 
-                compiled += 'var arity = ' + (token.SOURCE || '"all"') +  '; var func = (stack) => {';
+                compiled += `var arity = ${token.SOURCE || '1'} +  '; var func = (stack) => {`;
                 break;
             case 'CLOSE_MAP':
                 if(token.SOURCE == 'LAMBDA'){
                     compiled += '}; func.arity = arity; stack.push(func);';
+                }
+                if(token.SOURCE == 'MAP' || token.SOURCE == 'FILTER' || token.SOURCE == 'SORT_MAP'){
+                    compiled += `
+                    
+                    var a = pop(stack)
+                    inputstack.pop()
+                    console.log(a)
+                    return a;
+                }));`
                 }
                 break;
             case 'FUNC_DEF':
@@ -122,18 +167,70 @@ function run(code,inputs){
                         } else {
                             this['V_'+i] = pop(stack)
                         }
-                   }; inputstack.push(temp_stack); stack.push(FUNC_${token.SOURCE}([]));`
+                   }; inputstack.push(temp_stack); stack.push(FUNC_${token.SOURCE}([])); inputstack.pop();`
                    break;
             case 'FUNC_REF':
                 compiled += `stack.push(FUNC_${token.SOURCE})`
                 break;
+            case 'MAP':
+                compiled += `stack.push(lambda_map(pop(stack),val => {
+                    inputstack.push([val]);
+                    V_context_var = val
+                    var stack = [];`
+                    break;
+            case 'FILTER':
+                compiled += `stack.push(lambda_filt(pop(stack),val => {
+                    inputstack.push([val]);
+                    V_context_var = val
+                    var stack = [];`
+                    break;
+            case 'SORT_MAP':
+                compiled += `stack.push(lambda_sort(pop(stack),val => {
+                    inputstack.push([val]);
+                    V_context_var = val
+                    var stack = [];`
+
+                break;
+            case 'CHAR':
+                var parsing_stack = [];
+                while('vß⁽'.includes(token.SOURCE[0])){
+                    parsing_stack.push(token.SOURCE[0]);
+                    switch(token.SOURCE[0]){
+                        case 'v': 
+                        compiled += `var oldstack, k = stack;
+                        var res = lambda_map(pop(stack),val => {
+                            inputstack.push([null,...k,val]);
+                            V_context_var = val
+                            var stack = [];`;
+                            break;
+                        case 'ß': compiled += 'if(pop(stack)) { '; break;
+                        case '⁽': compiled += `stack.push(stack => {`
+                    }
+                    token.SOURCE = token.SOURCE.slice(1)
+                }
+                compiled += commands[token.SOURCE];
+                for(var x of parsing_stack){
+                    switch(x){
+                        case 'v': compiled += `
+                    
+                        var a = pop(stack)
+                        oldstack = inputstack.pop()
+                        console.log(a)
+                        return a;
+                    });
+                    console.log(oldstack)
+                    stack = [...oldstack.slice(oldstack.indexOf(null) + 1,oldstack.length),res]`; break;
+                        case 'ß': compiled += '}'; break;
+                        case '⁽': compiled += '})'; break;
+                    }
+                }
             default: break;
         }
     }
     console.log(compiled);
     eval(compiled)
-    //console.log(stack)
+    console.log(stack)
     console.log(output)
 }
 
-run('@ge:4|+++; 1 2 @ge; ,',[1n,2n])
+run('3 4 5.5 5 6⟨2|4|1|3|5⟩v+',[1n,2n])
